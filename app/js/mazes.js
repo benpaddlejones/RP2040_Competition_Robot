@@ -35,6 +35,44 @@ const Mazes = (function () {
    * @type {Record<string, MazeDefinition>}
    */
   const mazeDefinitions = {
+    // Straight corridor - single wall on the right for P / PD practice
+    straight_corridor: {
+      id: "straight_corridor",
+      name: "Straight Corridor",
+      difficulty: "Easy",
+      description:
+        "A straight corridor with a wall on the right — perfect for tuning P and PD controllers",
+      startPosition: { x: 300, y: 1700, heading: 0 },
+      endZone: { x: 100, y: 100, width: 300, height: 200 },
+      walls: [
+        // Right wall running the full arena height, 400mm from the left edge
+        { x: 500, y: 0, width: WALL_THICKNESS, height: 2000 },
+      ],
+    },
+
+    // Dead end corridor — requires front sensor detection and turning
+    dead_end: {
+      id: "dead_end",
+      name: "Dead End",
+      difficulty: "Medium",
+      description:
+        "A U-shaped corridor with a dead end — combine front detection with side wall following",
+      startPosition: { x: 300, y: 1700, heading: 0 },
+      endZone: { x: 1600, y: 100, width: 300, height: 200 },
+      walls: [
+        // Right wall of first corridor
+        { x: 500, y: 400, width: WALL_THICKNESS, height: 1600 },
+        // Top wall creating the dead end
+        { x: 0, y: 400, width: 530, height: WALL_THICKNESS },
+        // Left wall of return corridor
+        { x: 800, y: 400, width: WALL_THICKNESS, height: 1600 },
+        // Bottom gap wall — forces robot back south after turning
+        { x: 800, y: 1400, width: 1200, height: WALL_THICKNESS },
+        // Right wall of return corridor (south leg)
+        { x: 1100, y: 0, width: WALL_THICKNESS, height: 1430 },
+      ],
+    },
+
     // Simple maze - basic L-shaped corridor
     simple: {
       id: "simple",
@@ -275,13 +313,13 @@ const Mazes = (function () {
         wall.x * scale,
         wall.y * scale,
         wall.width * scale,
-        wall.height * scale
+        wall.height * scale,
       );
       ctx.strokeRect(
         wall.x * scale,
         wall.y * scale,
         wall.width * scale,
-        wall.height * scale
+        wall.height * scale,
       );
     }
 
@@ -294,13 +332,13 @@ const Mazes = (function () {
         maze.endZone.x * scale,
         maze.endZone.y * scale,
         maze.endZone.width * scale,
-        maze.endZone.height * scale
+        maze.endZone.height * scale,
       );
       ctx.strokeRect(
         maze.endZone.x * scale,
         maze.endZone.y * scale,
         maze.endZone.width * scale,
-        maze.endZone.height * scale
+        maze.endZone.height * scale,
       );
 
       // Draw "EXIT" label
@@ -310,7 +348,7 @@ const Mazes = (function () {
       ctx.fillText(
         "EXIT",
         (maze.endZone.x + maze.endZone.width / 2) * scale,
-        (maze.endZone.y + maze.endZone.height / 2 + 4) * scale
+        (maze.endZone.y + maze.endZone.height / 2 + 4) * scale,
       );
     }
 

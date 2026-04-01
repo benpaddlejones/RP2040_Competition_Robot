@@ -6,7 +6,7 @@
 // Global application state
 const App = {
   // Current state
-  currentChallenge: 0,
+  currentChallenge: 1,
   isRunning: false,
   isPaused: false,
   hasRun: false, // Track if code has been run (requires reset before running again)
@@ -419,10 +419,11 @@ function loadChallenge(challengeId) {
     }
   });
 
-  // Show/hide maze selector for Challenge 6
-  App.elements.mazeSelector.classList.toggle("d-none", challengeId !== 6);
+  // Show/hide maze selector when challenge uses a maze
+  const hasMaze = challenge && challenge.maze;
+  App.elements.mazeSelector.classList.toggle("d-none", !hasMaze);
 
-  // Show/hide gamepad for Challenge 7 and adjust editor height
+  // Show/hide gamepad for challenges with gamepadEnabled and adjust editor height
   const isGamepadChallenge = challenge && challenge.gamepadEnabled === true;
   App.elements.gamepadPanel.classList.toggle("d-none", !isGamepadChallenge);
 
@@ -2026,205 +2027,328 @@ function hideLoading() {
 function getStarterCodes() {
   return {
     // debug: loaded dynamically from project/main.py
-    0: `# Challenge 0: Fix the Code
-# This code has errors - can you find and fix them?
+    1: `# Challenge 1: Wall Follow — P Control
+# Follow the right wall using Proportional steering
 
 from aidriver import AIDriver, hold_state
-
 import aidriver
 
 aidriver.DEBUG_AIDRIVER = True
 my_robot = AIDriver()
 
-# HINT: Check for missing colons and spelling errors
-while my_robot.read_distance() == -1
-   print("Robot too close, too far or sensor is in error state")
+# ═══════════════════════════════════════════════════════
+# CONFIGURATION — Adjust these values
+# ═══════════════════════════════════════════════════════
+BASE_SPEED = 160          # Forward speed (must be > 120!)
+TARGET_WALL_DISTANCE = 150  # Distance to maintain from wall (mm)
+Kp = 0.5                  # Proportional gain
+MAX_STEERING = 40         # Max wheel speed difference
 
-my_robt.drive_forward(200, 200)
-hold_state(1)
-my_robot.brake()
+# Rule: BASE_SPEED - MAX_STEERING must be >= 120 (dead zone)
+
+# ═══════════════════════════════════════════════════════
+# MAIN LOOP
+# ═══════════════════════════════════════════════════════
+while True:
+    wall_distance = my_robot.read_distance_2()
+
+    if wall_distance == -1:
+        my_robot.drive(BASE_SPEED, BASE_SPEED)
+        hold_state(0.05)
+        continue
+
+    # Calculate error (positive = too far from wall)
+    error = wall_distance - TARGET_WALL_DISTANCE
+
+    # P controller: steering correction
+    steering = Kp * error
+
+    # Clamp steering
+    if steering > MAX_STEERING:
+        steering = MAX_STEERING
+    elif steering < -MAX_STEERING:
+        steering = -MAX_STEERING
+
+    # Apply differential steering (wall on RIGHT side)
+    right_speed = BASE_SPEED - steering
+    left_speed = BASE_SPEED + steering
+
+    my_robot.drive(int(right_speed), int(left_speed))
+    hold_state(0.05)
 `,
-    1: `# Challenge 1: Drive in a Straight Line
-# Balance the motor speeds so your robot drives straight
+    2: `# Challenge 2: Wall Follow — PD Control
+# Add the Derivative term to dampen oscillations
 
 from aidriver import AIDriver, hold_state
-
 import aidriver
 
 aidriver.DEBUG_AIDRIVER = True
 my_robot = AIDriver()
+
+# ═══════════════════════════════════════════════════════
+# CONFIGURATION
+# ═══════════════════════════════════════════════════════
+BASE_SPEED = 160
+TARGET_WALL_DISTANCE = 150
+Kp = 0.5
+Kd = 0.3                  # Derivative gain — dampens oscillations
+MAX_STEERING = 40
+
+# ═══════════════════════════════════════════════════════
+# MAIN LOOP
+# ═══════════════════════════════════════════════════════
+previous_error = 0
 
 while True:
-    my_robot.drive_forward(200, 200)
-    hold_state(0.1)
+    wall_distance = my_robot.read_distance_2()
+
+    if wall_distance == -1:
+        my_robot.drive(BASE_SPEED, BASE_SPEED)
+        hold_state(0.05)
+        continue
+
+    error = wall_distance - TARGET_WALL_DISTANCE
+
+    # Derivative: how fast is the error changing?
+    derivative = error - previous_error
+
+    # PD output
+    steering = (Kp * error) + (Kd * derivative)
+
+    if steering > MAX_STEERING:
+        steering = MAX_STEERING
+    elif steering < -MAX_STEERING:
+        steering = -MAX_STEERING
+
+    right_speed = BASE_SPEED - steering
+    left_speed = BASE_SPEED + steering
+
+    my_robot.drive(int(right_speed), int(left_speed))
+
+    previous_error = error
+    hold_state(0.05)
 `,
-    2: `# Challenge 2: Drive a Circle
-# Modify wheel_speed and speed_adjust to drive in a circle
+    3: `# Challenge 3: Wall Follow — Full PID
+# Add the Integral term to fix drift around the L corner
 
 from aidriver import AIDriver, hold_state
-
 import aidriver
 
 aidriver.DEBUG_AIDRIVER = True
 my_robot = AIDriver()
 
-my_counter = 0
-wheel_speed = 180
-speed_adjust = 0  # Modify this to turn
-move_time = 0     # Set the time to complete a circle
+# ═══════════════════════════════════════════════════════
+# CONFIGURATION
+# ═══════════════════════════════════════════════════════
+BASE_SPEED = 160
+TARGET_WALL_DISTANCE = 150
+Kp = 0.5
+Ki = 0.01                 # Integral gain — keep SMALL!
+Kd = 0.3
+MAX_STEERING = 40
+INTEGRAL_MAX = 500         # Anti-windup clamp
 
-while my_counter < 1:
-    my_robot.drive_backward(wheel_speed - speed_adjust, wheel_speed + speed_adjust)
-    hold_state(move_time)
-    my_robot.brake()
-    hold_state(1)
-    my_counter = my_counter + 1
-`,
-    3: `# Challenge 3: Distance Sensor
-# Use the ultrasonic sensor to stop 1000mm from a wall
-
-from aidriver import AIDriver, hold_state
-
-import aidriver
-
-aidriver.DEBUG_AIDRIVER = True
-my_robot = AIDriver()
-
-while my_robot.read_distance() == -1:
-    print("Robot too close, too far or sensor is in error state")
-
-my_counter = 0
-start_distance = my_robot.read_distance()
-current_distance = start_distance
-distance_remaining = current_distance - start_distance
-wheel_speed = 120
-speed_adjust = 0
-target_distance = 0  # Set to 1000 for the challenge
+# ═══════════════════════════════════════════════════════
+# MAIN LOOP
+# ═══════════════════════════════════════════════════════
+previous_error = 0
+integral = 0
 
 while True:
-    while distance_remaining < target_distance:
-        my_robot.drive_backward(wheel_speed - speed_adjust, wheel_speed + speed_adjust)
-        current_distance = my_robot.read_distance()
-        hold_state(0.1)
-        distance_remaining = current_distance - start_distance
-    my_robot.brake()
-    hold_state(1)
-    print(my_robot.read_distance())
-    hold_state(0.1)
+    wall_distance = my_robot.read_distance_2()
+
+    if wall_distance == -1:
+        my_robot.drive(BASE_SPEED, BASE_SPEED)
+        integral = 0       # Reset when wall lost
+        hold_state(0.05)
+        continue
+
+    error = wall_distance - TARGET_WALL_DISTANCE
+
+    # Integral: accumulated error
+    integral = integral + error
+    if integral > INTEGRAL_MAX:
+        integral = INTEGRAL_MAX
+    elif integral < -INTEGRAL_MAX:
+        integral = -INTEGRAL_MAX
+
+    # Derivative
+    derivative = error - previous_error
+
+    # Full PID
+    steering = (Kp * error) + (Ki * integral) + (Kd * derivative)
+
+    if steering > MAX_STEERING:
+        steering = MAX_STEERING
+    elif steering < -MAX_STEERING:
+        steering = -MAX_STEERING
+
+    right_speed = BASE_SPEED - steering
+    left_speed = BASE_SPEED + steering
+
+    my_robot.drive(int(right_speed), int(left_speed))
+
+    previous_error = error
+    hold_state(0.05)
 `,
-    4: `# Challenge 4: Drive a Square
-# Make the robot drive in a square pattern
+    4: `# Challenge 4: Dead End Detection
+# Combine front sensor with side PID wall following
 
 from aidriver import AIDriver, hold_state
-
 import aidriver
 
 aidriver.DEBUG_AIDRIVER = True
 my_robot = AIDriver()
 
-while my_robot.read_distance() == -1:
-    print("Robot too close, too far or sensor is in error state")
+# ═══════════════════════════════════════════════════════
+# CONFIGURATION
+# ═══════════════════════════════════════════════════════
+BASE_SPEED = 160
+TARGET_WALL_DISTANCE = 150
+FRONT_THRESHOLD = 250      # Distance to trigger a turn (mm)
+TURN_SPEED = 180
+TURN_TIME = 0              # TODO: tune for ~90 degree turn
 
-my_counter = 0
-target_counter = 4
-wheel_speed = 200
-speed_adjust = 0
-forward_time = 0    # Set time to drive 1m
-turn_speed = 200
-turn_time = 0       # Set time for 90 degree turn
+# PID gains (from Challenge 3)
+Kp = 0.5
+Ki = 0.01
+Kd = 0.3
+MAX_STEERING = 40
+INTEGRAL_MAX = 500
+
+# ═══════════════════════════════════════════════════════
+# MAIN LOOP
+# ═══════════════════════════════════════════════════════
+previous_error = 0
+integral = 0
 
 while True:
-    while my_counter < target_counter:
-        my_robot.drive_forward(wheel_speed - speed_adjust, wheel_speed + speed_adjust)
-        hold_state(forward_time)
+    front = my_robot.read_distance()
+
+    # Priority 1: Wall ahead — stop and turn
+    if front != -1 and front < FRONT_THRESHOLD:
         my_robot.brake()
-        hold_state(3)
-        my_robot.rotate_right(turn_speed)
-        hold_state(turn_time)
+        hold_state(0.3)
+        my_robot.rotate_left(TURN_SPEED)
+        hold_state(TURN_TIME)
         my_robot.brake()
-        my_counter = my_counter + 1
-    hold_state(1)
+        hold_state(0.3)
+        integral = 0
+        previous_error = 0
+        continue
+
+    # Priority 2: Side wall following with PID
+    wall_distance = my_robot.read_distance_2()
+
+    if wall_distance == -1:
+        my_robot.drive(BASE_SPEED, BASE_SPEED)
+        integral = 0
+        hold_state(0.05)
+        continue
+
+    error = wall_distance - TARGET_WALL_DISTANCE
+    integral = integral + error
+    if integral > INTEGRAL_MAX:
+        integral = INTEGRAL_MAX
+    elif integral < -INTEGRAL_MAX:
+        integral = -INTEGRAL_MAX
+    derivative = error - previous_error
+
+    steering = (Kp * error) + (Ki * integral) + (Kd * derivative)
+    if steering > MAX_STEERING:
+        steering = MAX_STEERING
+    elif steering < -MAX_STEERING:
+        steering = -MAX_STEERING
+
+    right_speed = BASE_SPEED - steering
+    left_speed = BASE_SPEED + steering
+    my_robot.drive(int(right_speed), int(left_speed))
+
+    previous_error = error
+    hold_state(0.05)
 `,
-    5: `# Challenge 5: Obstacle Avoidance
-# Drive forward and turn when an obstacle is detected
+    5: `# Challenge 5: Maze Solver — Hand on Wall
+# Full PID wall following + front detection + hand-on-wall algorithm
 
 from aidriver import AIDriver, hold_state
-
 import aidriver
 
 aidriver.DEBUG_AIDRIVER = True
 my_robot = AIDriver()
 
-wheel_speed = 200
-speed_adjust = 0
-turn_speed = 200
-turn_time = 0       # Set for 90 degree turn
-safe_distance = 0   # Set to 300mm
+# ═══════════════════════════════════════════════════════
+# CONFIGURATION
+# ═══════════════════════════════════════════════════════
+BASE_SPEED = 160
+TARGET_WALL_DISTANCE = 150
+FRONT_THRESHOLD = 250
+TURN_SPEED = 180
+TURN_TIME = 0              # TODO: tune for ~90 degree turn
 
-def turn_left():
-    # Implement 90 degree left turn here
-    my_robot.rotate_left(turn_speed)
-    hold_state(turn_time)
-    my_robot.brake()
+# PID gains
+Kp = 0.5
+Ki = 0.01
+Kd = 0.3
+MAX_STEERING = 40
+INTEGRAL_MAX = 500
 
-def drive_forward():
-    # Implement drive forward here
-    my_robot.drive_forward(wheel_speed - speed_adjust, wheel_speed + speed_adjust)
-    hold_state(0.1)
+WALL_SIDE = "right"        # Follow the right wall
 
-def brake():
-    my_robot.brake()
-    hold_state(0.5)
+# ═══════════════════════════════════════════════════════
+# MAIN LOOP — Hand on Wall Algorithm
+# ═══════════════════════════════════════════════════════
+previous_error = 0
+integral = 0
 
 while True:
-    distance = my_robot.read_distance()
-    if distance != -1 and distance < safe_distance:
-        brake()
-        turn_left()
+    front = my_robot.read_distance()
+    side = my_robot.read_distance_2()
+
+    # Priority 1: Wall ahead — must turn
+    if front != -1 and front < FRONT_THRESHOLD:
+        my_robot.brake()
+        hold_state(0.3)
+        my_robot.rotate_left(TURN_SPEED)
+        hold_state(TURN_TIME)
+        my_robot.brake()
+        hold_state(0.3)
+        integral = 0
+        previous_error = 0
+
+    # Priority 2: Lost the wall — gentle turn toward it
+    elif side == -1:
+        if WALL_SIDE == "right":
+            my_robot.drive(BASE_SPEED, int(BASE_SPEED * 0.6))
+        else:
+            my_robot.drive(int(BASE_SPEED * 0.6), BASE_SPEED)
+
+    # Priority 3: Wall visible — PID follow
     else:
-        drive_forward()
-`,
-    6: `# Challenge 6: Maze Navigation
-# Navigate through the maze to reach the exit
+        error = side - TARGET_WALL_DISTANCE
+        integral = integral + error
+        if integral > INTEGRAL_MAX:
+            integral = INTEGRAL_MAX
+        elif integral < -INTEGRAL_MAX:
+            integral = -INTEGRAL_MAX
+        derivative = error - previous_error
 
-from aidriver import AIDriver, hold_state
+        steering = (Kp * error) + (Ki * integral) + (Kd * derivative)
+        if steering > MAX_STEERING:
+            steering = MAX_STEERING
+        elif steering < -MAX_STEERING:
+            steering = -MAX_STEERING
 
-import aidriver
+        if WALL_SIDE == "right":
+            right_speed = BASE_SPEED - steering
+            left_speed = BASE_SPEED + steering
+        else:
+            right_speed = BASE_SPEED + steering
+            left_speed = BASE_SPEED - steering
 
-aidriver.DEBUG_AIDRIVER = True
-my_robot = AIDriver()
+        my_robot.drive(int(right_speed), int(left_speed))
+        previous_error = error
 
-wheel_speed = 150
-turn_speed = 150
-safe_distance = 200
-
-# Your maze navigation algorithm here
-while True:
-    distance = my_robot.read_distance()
-    
-    # TODO: Implement your maze solving algorithm
-    # Hint: Check distance, decide to go forward or turn
-    
-    hold_state(0.1)
-`,
-    7: `# Challenge 7: Gamepad Control
-# Use the on-screen gamepad to control your robot
-# This challenge uses manual control - no code needed!
-
-from aidriver import AIDriver
-
-import aidriver
-
-aidriver.DEBUG_AIDRIVER = True
-my_robot = AIDriver()
-
-print("Use the gamepad controls below the arena")
-print("Press the arrow buttons to drive the robot")
-
-# The gamepad bypasses Python code
-# This is just for demonstration
-while True:
-    pass
+    hold_state(0.05)
 `,
   };
 }

@@ -1,6 +1,6 @@
 /**
  * AIDriver Simulator - Challenge Definitions
- * Defines all 8 challenges (0-7) with goals, paths, success criteria
+ * PID wall-following progression: 5 challenges building to full maze solving
  */
 
 const Challenges = (function () {
@@ -25,15 +25,15 @@ const Challenges = (function () {
       title: "Debug Script",
       subtitle: "Hardware Test",
       icon: "bi-bug",
-      menuGroup: "special", // Shows at top with divider after
+      menuGroup: "special",
       difficulty: DIFFICULTY.BEGINNER,
       description:
         "Run the hardware debug script (project/main.py) to test all robot functions.",
-      goal: "Verify motors, rotation, and ultrasonic sensor are working correctly.",
+      goal: "Verify motors, sensors, and the drive() method are working correctly.",
       hints: [
         "This script tests all hardware functions",
         "Watch the robot drive forward, backward, rotate, and read distances",
-        "Check the debug output for sensor readings",
+        "Check the debug output for front and side sensor readings",
       ],
       startPosition: { x: 1000, y: 1800, heading: 0 },
       successCriteria: {
@@ -44,241 +44,146 @@ const Challenges = (function () {
       obstacles: [],
     },
 
-    // Challenge 0: Fix the Code
-    0: {
-      id: 0,
-      title: "Fix the Code",
-      subtitle: "Debug Practice",
-      icon: "bi-wrench",
-      menuGroup: "basic",
-      difficulty: DIFFICULTY.BEGINNER,
-      description: "Find and fix the syntax errors in the provided code.",
-      goal: "Make the code run without errors. The robot should drive forward.",
-      hints: [
-        "Look for missing colons (:) after 'while' statements",
-        "Check variable names for typos (my_robot vs my_robt)",
-        "Python is case-sensitive!",
-      ],
-      startPosition: { x: 1000, y: 1800, heading: 0 },
-      successCriteria: {
-        type: "run_without_error",
-        minDistance: 100, // Must move at least 100mm
-      },
-      path: null, // No specific path required
-      obstacles: [],
-    },
-
-    // Challenge 1: Drive in a Straight Line
+    // Challenge 1: P Controller — Wall Following in a Straight Corridor
     1: {
       id: 1,
-      title: "Drive in a Straight Line",
-      subtitle: "Motor Balance",
+      title: "Wall Follow — P Control",
+      subtitle: "Proportional Steering",
       icon: "bi-arrow-up",
       menuGroup: "basic",
       difficulty: DIFFICULTY.BEGINNER,
-      description: "Balance the motor speeds so the robot drives straight.",
-      goal: "Drive from start to the green target zone without veering off.",
+      description:
+        "Use the side ultrasonic sensor and Proportional control to follow a straight wall.",
+      goal: "Follow the wall from start to the green exit zone without hitting it.",
       hints: [
-        "If robot veers right, increase left motor speed",
-        "If robot veers left, increase right motor speed",
-        "Small adjustments (5-10) make a big difference",
+        "read_distance_2() reads the side ultrasonic sensor",
+        "error = wall_distance - TARGET_WALL_DISTANCE",
+        "steering = Kp * error adjusts wheel speed difference",
+        "Keep BASE_SPEED - MAX_STEERING >= 120 (dead zone)",
+        "drive() handles signed speeds and the dead zone automatically",
       ],
-      startPosition: { x: 1000, y: 1800, heading: 0 },
+      startPosition: { x: 300, y: 1700, heading: 0 },
       successCriteria: {
         type: "reach_zone",
-        zone: { x: 900, y: 0, width: 200, height: 150 },
-        maxDeviation: 150, // Max allowed X deviation from center
+        zone: { x: 100, y: 100, width: 300, height: 200 },
       },
-      path: {
-        type: "line",
-        start: { x: 1000, y: 1800 },
-        end: { x: 1000, y: 75 },
-        width: 150,
-      },
+      path: null,
       obstacles: [],
+      maze: "straight_corridor",
     },
 
-    // Challenge 2: Drive a Circle
+    // Challenge 2: PD Controller — Off-Centre Start
     2: {
       id: 2,
-      title: "Drive a Circle",
-      subtitle: "Differential Drive",
-      icon: "bi-circle",
+      title: "Wall Follow — PD Control",
+      subtitle: "Dampen Oscillations",
+      icon: "bi-activity",
       menuGroup: "basic",
       difficulty: DIFFICULTY.EASY,
-      description: "Modify wheel speeds to make the robot drive in a circle.",
-      goal: "Complete at least one full circle and return near the start.",
+      description:
+        "Add the Derivative term to dampen oscillations when starting off-centre.",
+      goal: "Follow the wall smoothly to the exit zone — P alone will oscillate.",
       hints: [
-        "Different wheel speeds cause turning",
-        "Faster left wheel = turn right",
-        "Faster right wheel = turn left",
-        "Larger speed difference = tighter circle",
+        "derivative = error - previous_error",
+        "steering = (Kp * error) + (Kd * derivative)",
+        "D opposes rapid change — it slows approach and reduces overshoot",
+        "Start with Kd = 0.3, then tune",
+        "Remember to save previous_error each loop",
       ],
-      startPosition: { x: 1000, y: 1400, heading: 90 },
-      successCriteria: {
-        type: "complete_circle",
-        centerTolerance: 100, // Must finish inside the 100mm finish box
-        minRotation: 330, // Must rotate at least 330 degrees
-      },
-      path: {
-        type: "circle",
-        center: { x: 1000, y: 1000 },
-        radius: 400,
-        width: 150,
-      },
-      obstacles: [],
-    },
-
-    // Challenge 3: Detect and Stop
-    3: {
-      id: 3,
-      title: "Detect and Stop",
-      subtitle: "Ultrasonic Sensor",
-      icon: "bi-rulers",
-      menuGroup: "basic",
-      difficulty: DIFFICULTY.EASY,
-      description: "Use the ultrasonic sensor to detect the wall and stop.",
-      goal: "Stop within 100-200mm of the wall without hitting it.",
-      hints: [
-        "read_distance() returns distance in mm",
-        "Returns -1 if too close (<20mm) or too far (>2000mm)",
-        "Check distance in a loop and brake() when close enough",
-      ],
-      startPosition: { x: 1000, y: 1800, heading: 0 },
-      successCriteria: {
-        type: "stop_at_distance",
-        targetDistance: { min: 100, max: 200 },
-        wallPosition: 50, // Y position of wall
-      },
-      path: {
-        type: "line",
-        start: { x: 1000, y: 1800 },
-        end: { x: 1000, y: 200 },
-        width: 200,
-      },
-      obstacles: [],
-    },
-
-    // Challenge 4: Drive a Square
-    4: {
-      id: 4,
-      title: "Drive a Square",
-      subtitle: "Precision Turning",
-      icon: "bi-square",
-      menuGroup: "basic",
-      difficulty: DIFFICULTY.MEDIUM,
-      description: "Drive in a square pattern using 90-degree turns.",
-      goal: "Complete a square path and return to the starting position.",
-      hints: [
-        "Drive forward a set distance",
-        "Use rotate_left() or rotate_right() to turn 90 degrees",
-        "Repeat 4 times to complete the square",
-        "Timing is key for accurate turns",
-      ],
-      startPosition: { x: 600, y: 1400, heading: 0 },
-      successCriteria: {
-        type: "complete_square",
-        startZone: { x: 500, y: 1300, width: 200, height: 200 },
-        minSideLength: 600,
-        corners: 4,
-      },
-      path: {
-        type: "square",
-        corner: { x: 600, y: 1400 },
-        size: 800,
-        width: 150,
-      },
-      obstacles: [],
-    },
-
-    // Challenge 5: Obstacle Avoidance
-    5: {
-      id: 5,
-      title: "Obstacle Avoidance",
-      subtitle: "Sensor Navigation",
-      icon: "bi-exclamation-triangle",
-      menuGroup: "basic",
-      difficulty: DIFFICULTY.MEDIUM,
-      description: "Navigate around obstacles using the ultrasonic sensor.",
-      goal: "Turn left, then right to reach the target zone.",
-      hints: [
-        "Use read_distance() to detect obstacles ahead",
-        "Turn left when you detect the first obstacle",
-        "Turn right when you detect the second obstacle",
-        "Then drive forward to the target",
-      ],
-      startPosition: { x: 1000, y: 1800, heading: 0 },
+      startPosition: { x: 150, y: 1700, heading: 10 },
       successCriteria: {
         type: "reach_zone",
-        zone: { x: 400, y: 100, width: 200, height: 200 },
+        zone: { x: 100, y: 100, width: 300, height: 200 },
       },
-      path: {
-        type: "obstacle_course",
-        waypoints: [
-          { x: 1000, y: 1800 },
-          { x: 1000, y: 900 },
-          { x: 500, y: 900 },
-          { x: 500, y: 200 },
-        ],
-        width: 200,
-      },
-      obstacles: [
-        { x: 900, y: 500, width: 200, height: 200 }, // Directly ahead - turn left (gap from path)
-        { x: 100, y: 800, width: 200, height: 200 }, // On horizontal path center - turn right
-      ],
+      path: null,
+      obstacles: [],
+      maze: "straight_corridor",
     },
 
-    // Challenge 6: Maze Navigation
-    6: {
-      id: 6,
-      title: "Maze Navigation",
-      subtitle: "Autonomous Navigation",
+    // Challenge 3: Full PID — L-Shaped Corridor
+    3: {
+      id: 3,
+      title: "Wall Follow — Full PID",
+      subtitle: "Integral Correction",
+      icon: "bi-bezier2",
+      menuGroup: "basic",
+      difficulty: DIFFICULTY.MEDIUM,
+      description:
+        "Add the Integral term to correct steady-state drift around an L-shaped corner.",
+      goal: "Follow the wall around the L corner to the exit zone.",
+      hints: [
+        "integral = integral + error — accumulated error over time",
+        "steering = (Kp * error) + (Ki * integral) + (Kd * derivative)",
+        "Keep Ki very small (start 0.01) to avoid windup",
+        "Clamp integral to INTEGRAL_MAX to prevent runaway",
+        "Reset integral to 0 when sensor returns -1",
+      ],
+      startPosition: { x: 300, y: 1700, heading: 0 },
+      successCriteria: {
+        type: "reach_zone",
+        zone: { x: 100, y: 100, width: 200, height: 200 },
+      },
+      path: null,
+      obstacles: [],
+      maze: "simple",
+    },
+
+    // Challenge 4: Front + Side Sensors — Dead End Detection
+    4: {
+      id: 4,
+      title: "Dead End Detection",
+      subtitle: "Sensor Fusion",
+      icon: "bi-sign-turn-right",
+      menuGroup: "advanced",
+      difficulty: DIFFICULTY.MEDIUM,
+      description:
+        "Combine the front sensor with side PID to detect and navigate past a dead end.",
+      goal: "Follow the wall, detect the dead end, turn, and reach the exit.",
+      hints: [
+        "Use read_distance() for the front sensor — detects the dead end",
+        "If front < FRONT_THRESHOLD → stop, turn, then continue wall following",
+        "Reset integral and previous_error after turning",
+        "Use read_distance_2() for side PID as before",
+        "Think: wall ahead → turn; wall beside → PID follow",
+      ],
+      startPosition: { x: 300, y: 1700, heading: 0 },
+      successCriteria: {
+        type: "reach_zone",
+        zone: { x: 1600, y: 100, width: 300, height: 200 },
+      },
+      path: null,
+      obstacles: [],
+      maze: "dead_end",
+    },
+
+    // Challenge 5: Full Maze Solving — Hand on Wall
+    5: {
+      id: 5,
+      title: "Maze Solver",
+      subtitle: "Hand-on-Wall",
       icon: "bi-signpost-split",
       menuGroup: "advanced",
       difficulty: DIFFICULTY.HARD,
-      description: "Navigate through a maze using ultrasonic sensing.",
-      goal: "Reach the exit zone without hitting walls.",
+      description:
+        "Navigate the full maze using PID wall following and the hand-on-wall algorithm.",
+      goal: "Reach the exit zone without hitting walls. Time limit: 60 seconds.",
       hints: [
-        "Use read_distance() to detect walls",
-        "Turn when you get too close",
-        "Wall-following is a common strategy",
-        "Left-hand rule or right-hand rule can work",
+        "Hand-on-wall: keep one hand touching the wall at all times",
+        "Priority 1: Wall ahead → stop and turn away",
+        "Priority 2: Lost the wall (side = -1) → gentle turn toward it",
+        "Priority 3: Wall visible → PID follow as before",
+        "Choose right-hand or left-hand rule and be consistent",
+        "Use the maze selector to try different difficulty levels",
       ],
       startPosition: { x: 300, y: 1700, heading: 0 },
       successCriteria: {
         type: "reach_zone",
         zone: { x: 1700, y: 100, width: 200, height: 200 },
-        timeLimit: 60, // 60 seconds max
-      },
-      path: null,
-      obstacles: [], // Defined by maze loader
-      maze: "simple", // Default maze
-    },
-
-    // Challenge 7: Gamepad Control
-    7: {
-      id: 7,
-      title: "Gamepad Control",
-      subtitle: "Manual Driving",
-      icon: "bi-controller",
-      menuGroup: "advanced",
-      difficulty: DIFFICULTY.BEGINNER,
-      description:
-        "Pair the BLE gamepad with your HM-10 module and drive the robot or simulator manually.",
-      goal: "Practice manual control while monitoring live ultrasonic telemetry.",
-      hints: [
-        "Select BLE Gamepad and tap Connect to pair with the HM-10",
-        "Drag the joystick or use WASD / arrow keys to steer",
-        "Watch the distance readout to plan safe braking",
-      ],
-      startPosition: { x: 1000, y: 1000, heading: 0 },
-      successCriteria: {
-        type: "manual",
-        noAutoCheck: true,
+        timeLimit: 60,
       },
       path: null,
       obstacles: [],
-      gamepadEnabled: true,
+      maze: "zigzag",
     },
   };
 
@@ -288,7 +193,7 @@ const Challenges = (function () {
    * @returns {object} Challenge metadata including paths, goals, and criteria.
    */
   function get(id) {
-    return definitions[id] || definitions[0];
+    return definitions[id] || definitions[1];
   }
 
   /**
@@ -409,20 +314,20 @@ const Challenges = (function () {
       return {
         success: false,
         message: `Complete more rotation (${Math.abs(totalRotation).toFixed(
-          0
+          0,
         )}° / ${criteria.minRotation}°)`,
       };
     }
 
     const distanceFromStart = Math.hypot(
       robot.x - startPos.x,
-      robot.y - startPos.y
+      robot.y - startPos.y,
     );
     if (distanceFromStart > criteria.centerTolerance) {
       return {
         success: false,
         message: `Return closer to start (${distanceFromStart.toFixed(
-          0
+          0,
         )}mm away)`,
       };
     }
@@ -550,7 +455,7 @@ const Challenges = (function () {
       html += `<li><hr class="dropdown-divider" /></li>`;
     }
 
-    // Basic group (challenges 0-5)
+    // Basic group (challenges 1-3: P, PD, PID)
     groups.basic.forEach((c) => {
       const href =
         menuType === "docs"
@@ -567,7 +472,7 @@ const Challenges = (function () {
       html += `<li><hr class="dropdown-divider" /></li>`;
     }
 
-    // Advanced group (challenges 6-7)
+    // Advanced group (challenges 4-5: sensor fusion, maze)
     groups.advanced.forEach((c) => {
       const href =
         menuType === "docs"

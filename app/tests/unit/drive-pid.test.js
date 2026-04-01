@@ -308,7 +308,10 @@ describe("drive() - Command processing", () => {
 
   test("negative drive speeds should be preserved in robot state", () => {
     const robot = { leftSpeed: 0, rightSpeed: 0, isMoving: false };
-    const cmd = { type: "drive", params: { rightSpeed: -200, leftSpeed: -200 } };
+    const cmd = {
+      type: "drive",
+      params: { rightSpeed: -200, leftSpeed: -200 },
+    };
 
     robot.leftSpeed = cmd.params.leftSpeed;
     robot.rightSpeed = cmd.params.rightSpeed;

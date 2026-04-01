@@ -12,7 +12,7 @@ describe("Full Application Integration", () => {
   beforeEach(() => {
     // Create mock application state
     App = {
-      currentChallenge: 0,
+      currentChallenge: 1,
       isRunning: false,
       robot: {
         x: 1000,
@@ -92,7 +92,7 @@ describe("Full Application Integration", () => {
 
   describe("Application Startup", () => {
     test("should initialize with default state", () => {
-      expect(App.currentChallenge).toBe(0);
+      expect(App.currentChallenge).toBe(1);
       expect(App.isRunning).toBe(false);
       expect(App.robot.x).toBe(1000);
       expect(App.robot.y).toBe(1000);
@@ -235,23 +235,15 @@ describe("Full Application Integration", () => {
     });
   });
 
-  describe("Gamepad Mode (Challenge 7)", () => {
-    test("should disable editor for gamepad challenge", () => {
-      App.currentChallenge = 7;
-
-      const isGamepadChallenge = App.currentChallenge === 7;
-      expect(isGamepadChallenge).toBe(true);
-    });
-
-    test("should allow direct robot control in gamepad mode", () => {
-      App.currentChallenge = 7;
-
-      // Simulate gamepad input
-      App.robot.leftSpeed = 100;
-      App.robot.rightSpeed = 100;
-      App.robot.isMoving = true;
-
-      expect(App.robot.isMoving).toBe(true);
+  describe("PID Challenge Mode", () => {
+    test("all challenges should require code (no gamepad mode)", () => {
+      // PID challenges 1-5 all require user code
+      for (let i = 1; i <= 5; i++) {
+        App.currentChallenge = i;
+        const isCodeChallenge =
+          App.currentChallenge >= 1 && App.currentChallenge <= 5;
+        expect(isCodeChallenge).toBe(true);
+      }
     });
   });
 
@@ -264,9 +256,9 @@ describe("Full Application Integration", () => {
       const load = (key) => mockStorage[key];
 
       Editor.setCode("print('hello')");
-      save("challenge_0_code", Editor.getCode());
+      save("challenge_1_code", Editor.getCode());
 
-      expect(load("challenge_0_code")).toBe("print('hello')");
+      expect(load("challenge_1_code")).toBe("print('hello')");
     });
 
     test("should load saved code on challenge switch", () => {
@@ -296,14 +288,14 @@ describe("Full Application Integration", () => {
 
     test("should enable/disable controls based on running state", () => {
       function shouldDisableControls() {
-        return PythonRunner.isRunning && App.currentChallenge !== 7;
+        return PythonRunner.isRunning;
       }
 
-      App.currentChallenge = 0;
+      App.currentChallenge = 1;
       PythonRunner.isRunning = true;
       expect(shouldDisableControls()).toBe(true);
 
-      App.currentChallenge = 7;
+      PythonRunner.isRunning = false;
       expect(shouldDisableControls()).toBe(false);
     });
   });
@@ -320,24 +312,24 @@ describe("Full Application Integration", () => {
         return completedChallenges.size;
       }
 
-      completeChallenge(0);
       completeChallenge(1);
       completeChallenge(2);
+      completeChallenge(3);
 
       expect(getProgress()).toBe(3);
     });
 
     test("should track completion status", () => {
       const status = {
-        0: "completed",
         1: "completed",
-        2: "in-progress",
-        3: "locked",
+        2: "completed",
+        3: "in-progress",
+        4: "locked",
       };
 
-      expect(status[0]).toBe("completed");
-      expect(status[2]).toBe("in-progress");
-      expect(status[3]).toBe("locked");
+      expect(status[1]).toBe("completed");
+      expect(status[3]).toBe("in-progress");
+      expect(status[4]).toBe("locked");
     });
   });
 

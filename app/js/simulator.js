@@ -24,6 +24,9 @@ const Simulator = (function () {
   const ULTRASONIC_MAX = 2000; // mm maximum detection
   const ULTRASONIC_CONE_ANGLE = 15; // degrees half-angle
 
+  // Side sensor placement: "left" or "right" (relative to robot heading)
+  let sideSensorSide = "left";
+
   // Simulation state
   let lastUpdateTime = 0;
   let simulationSpeed = 1.0;
@@ -263,7 +266,7 @@ const Simulator = (function () {
         obstacle.x,
         obstacle.y,
         obstacle.width,
-        obstacle.height
+        obstacle.height,
       );
       if (obstDist !== null && obstDist < minDistance) {
         minDistance = obstDist;
@@ -280,7 +283,7 @@ const Simulator = (function () {
         wall.x,
         wall.y,
         wall.width,
-        wall.height
+        wall.height,
       );
       if (wallDist !== null && wallDist < minDistance) {
         minDistance = wallDist;
@@ -298,6 +301,136 @@ const Simulator = (function () {
     // Add some noise (±2mm)
     const noise = (Math.random() - 0.5) * 4;
     return Math.round(minDistance + noise);
+  }
+
+  /**
+   * Simulate the side-facing ultrasonic sensor mounted perpendicular to the
+   * robot chassis. The side is determined by the current sideSensorSide
+   * setting ("left" or "right"). Uses the same ray-casting logic as the
+   * front sensor but fires the ray at 90 degrees relative to the heading.
+   *
+   * @param {{x:number,y:number,heading:number}} robot Robot pose to sample.
+   * @returns {number} Millimetres to the nearest surface or -1 when no valid reading.
+   */
+  function simulateUltrasonicSide(robot) {
+    const headingRad = (robot.heading * Math.PI) / 180;
+
+    // The simulator uses a heading convention where forward is
+    //   (sin(heading), -cos(heading)).
+    // The perpendicular directions in this system are:
+    //   Left  = (-cos(heading), -sin(heading))
+    //   Right = ( cos(heading),  sin(heading))
+    let rayDirX, rayDirY;
+    if (sideSensorSide === "left") {
+      rayDirX = -Math.cos(headingRad);
+      rayDirY = -Math.sin(headingRad);
+    } else {
+      rayDirX = Math.cos(headingRad);
+      rayDirY = Math.sin(headingRad);
+    }
+
+    // Sensor position: centre of the relevant side of the robot body
+    const sensorX = robot.x + rayDirX * (ROBOT_WIDTH / 2);
+    const sensorY = robot.y + rayDirY * (ROBOT_WIDTH / 2);
+
+    // Check distance to walls
+    let minDistance = ULTRASONIC_MAX + 1;
+
+    // Top wall (y = 0)
+    if (rayDirY < 0) {
+      const t = -sensorY / rayDirY;
+      if (t > 0 && t < minDistance) {
+        minDistance = t;
+      }
+    }
+
+    // Bottom wall (y = ARENA_HEIGHT)
+    if (rayDirY > 0) {
+      const t = (ARENA_HEIGHT - sensorY) / rayDirY;
+      if (t > 0 && t < minDistance) {
+        minDistance = t;
+      }
+    }
+
+    // Left wall (x = 0)
+    if (rayDirX < 0) {
+      const t = -sensorX / rayDirX;
+      if (t > 0 && t < minDistance) {
+        minDistance = t;
+      }
+    }
+
+    // Right wall (x = ARENA_WIDTH)
+    if (rayDirX > 0) {
+      const t = (ARENA_WIDTH - sensorX) / rayDirX;
+      if (t > 0 && t < minDistance) {
+        minDistance = t;
+      }
+    }
+
+    // Check distance to obstacles
+    for (const obstacle of obstacles) {
+      const obstDist = rayBoxIntersection(
+        sensorX,
+        sensorY,
+        rayDirX,
+        rayDirY,
+        obstacle.x,
+        obstacle.y,
+        obstacle.width,
+        obstacle.height,
+      );
+      if (obstDist !== null && obstDist < minDistance) {
+        minDistance = obstDist;
+      }
+    }
+
+    // Check distance to maze walls
+    for (const wall of mazeWalls) {
+      const wallDist = rayBoxIntersection(
+        sensorX,
+        sensorY,
+        rayDirX,
+        rayDirY,
+        wall.x,
+        wall.y,
+        wall.width,
+        wall.height,
+      );
+      if (wallDist !== null && wallDist < minDistance) {
+        minDistance = wallDist;
+      }
+    }
+
+    // Apply sensor limits
+    if (minDistance < ULTRASONIC_MIN) {
+      return -1; // Too close
+    }
+    if (minDistance > ULTRASONIC_MAX) {
+      return -1; // Too far / no reading
+    }
+
+    // Add some noise (±2mm)
+    const noise = (Math.random() - 0.5) * 4;
+    return Math.round(minDistance + noise);
+  }
+
+  /**
+   * Set which side the secondary ultrasonic sensor is mounted on.
+   * @param {"left"|"right"} side The side to mount the sensor.
+   */
+  function setSideSensorSide(side) {
+    if (side === "left" || side === "right") {
+      sideSensorSide = side;
+    }
+  }
+
+  /**
+   * Get the current side sensor placement.
+   * @returns {"left"|"right"} Current side sensor side.
+   */
+  function getSideSensorSide() {
+    return sideSensorSide;
   }
 
   /**
@@ -453,6 +586,7 @@ const Simulator = (function () {
     // Methods
     step,
     simulateUltrasonic,
+    simulateUltrasonicSide,
     checkCollision,
     getRobotCorners,
     setSpeed,
@@ -461,5 +595,7 @@ const Simulator = (function () {
     clearObstacles,
     getInitialRobotState,
     applyBoundaryConstraints,
+    setSideSensorSide,
+    getSideSensorSide,
   };
 })();

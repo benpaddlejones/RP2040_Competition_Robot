@@ -80,9 +80,12 @@ const Validator = (function () {
     "rotate_left",
     "rotate_right",
     "brake",
+    "drive",
     "read_distance",
+    "read_distance_2",
     "is_moving",
     "get_motor_speeds",
+    "set_motor_speeds",
   ]);
 
   // Forbidden patterns - things we don't want in student code
@@ -399,7 +402,7 @@ const Validator = (function () {
 
     console.log(
       "[Validator] Found AIDriver instances:",
-      Array.from(aiDriverVars)
+      Array.from(aiDriverVars),
     );
 
     // Now check all method calls on AIDriver instances
@@ -416,7 +419,7 @@ const Validator = (function () {
         while ((methodMatch = methodPattern.exec(line)) !== null) {
           const methodName = methodMatch[1];
           console.log(
-            `[Validator] Line ${lineNum}: Found method call ${varName}.${methodName}()`
+            `[Validator] Line ${lineNum}: Found method call ${varName}.${methodName}()`,
           );
 
           if (!AIDRIVER_METHODS.has(methodName)) {
@@ -424,7 +427,7 @@ const Validator = (function () {
             warnings.push({
               line: lineNum,
               message: `'${methodName}' is not a valid AIDriver method. Valid methods: ${Array.from(
-                AIDRIVER_METHODS
+                AIDRIVER_METHODS,
               ).join(", ")}`,
               type: "method",
             });
@@ -509,7 +512,7 @@ const Validator = (function () {
           continue;
 
         console.log(
-          `[Validator] Line ${lineNum}: Unknown function call '${funcName}()'`
+          `[Validator] Line ${lineNum}: Unknown function call '${funcName}()'`,
         );
         errors.push({
           line: lineNum,

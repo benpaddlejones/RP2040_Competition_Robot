@@ -1,156 +1,96 @@
 /**
  * Challenges Unit Tests
- * Tests for challenge definitions and success criteria
+ * Tests for PID wall-following challenge definitions and success criteria
  */
 
 describe("Challenges", () => {
   let ChallengesImpl;
 
   beforeEach(() => {
-    // Create Challenges implementation
+    // Create Challenges implementation matching the new PID progression
     ChallengesImpl = {
       list: [
         {
-          id: 0,
-          name: "Challenge 0: Hello World",
-          description: "Get your first program running",
-          startCode: `from aidriver import AIDriver
-
-robot = AIDriver()
-
-# Your code here
-print("Hello AIDriver!")`,
-          successCriteria: function (robot, startPos) {
-            // Just needs to run without errors
-            return true;
-          },
-          mazeId: null,
-        },
-        {
           id: 1,
-          name: "Challenge 1: Move Forward",
-          description: "Move the robot forward",
-          startCode: `from aidriver import AIDriver
-import time
-
-robot = AIDriver()
-
-# Move forward
-robot.drive_forward()
-time.sleep(2)
-robot.brake()`,
-          successCriteria: function (robot, startPos) {
-            // Robot should have moved forward (positive X direction when angle = 0)
-            return robot.x > startPos.x + 100;
+          name: "Challenge 1: Wall Follow — P Control",
+          description:
+            "Use the side sensor and P control to follow a straight wall",
+          startCode: `from aidriver import AIDriver, hold_state
+import aidriver
+my_robot = AIDriver()
+# P controller wall following`,
+          successCriteria: function (robot) {
+            return (
+              robot.x >= 100 &&
+              robot.x <= 400 &&
+              robot.y >= 100 &&
+              robot.y <= 300
+            );
           },
-          mazeId: null,
+          maze: "straight_corridor",
         },
         {
           id: 2,
-          name: "Challenge 2: Square Dance",
-          description: "Drive in a square pattern",
-          startCode: `from aidriver import AIDriver
-import time
-
-robot = AIDriver()
-
-# Drive in a square
-for i in range(4):
-    robot.drive_forward()
-    time.sleep(1)
-    robot.brake()
-    robot.rotate_right()
-    time.sleep(0.5)
-    robot.brake()`,
-          successCriteria: function (robot, startPos) {
-            // Robot should return close to start position
-            const dx = robot.x - startPos.x;
-            const dy = robot.y - startPos.y;
-            return Math.sqrt(dx * dx + dy * dy) < 200;
+          name: "Challenge 2: Wall Follow — PD Control",
+          description: "Add the Derivative term to dampen oscillations",
+          startCode: `from aidriver import AIDriver, hold_state
+import aidriver
+my_robot = AIDriver()
+# PD controller wall following`,
+          successCriteria: function (robot) {
+            return (
+              robot.x >= 100 &&
+              robot.x <= 400 &&
+              robot.y >= 100 &&
+              robot.y <= 300
+            );
           },
-          mazeId: null,
+          maze: "straight_corridor",
         },
         {
           id: 3,
-          name: "Challenge 3: Wall Follower",
-          description: "Use ultrasonic to follow walls",
-          startCode: `from aidriver import AIDriver
-import time
-
-robot = AIDriver()
-
-while True:
-    distance = robot.get_ultrasonic()
-    if distance < 300:
-        robot.rotate_right()
-        time.sleep(0.3)
-    else:
-        robot.drive_forward()
-    time.sleep(0.1)`,
-          successCriteria: function (robot, startPos) {
-            // Robot should navigate without crashing
-            return !robot.crashed;
+          name: "Challenge 3: Wall Follow — Full PID",
+          description: "Add the Integral term to fix drift around an L corner",
+          startCode: `from aidriver import AIDriver, hold_state
+import aidriver
+my_robot = AIDriver()
+# Full PID wall following`,
+          successCriteria: function (robot) {
+            return (
+              robot.x >= 100 &&
+              robot.x <= 300 &&
+              robot.y >= 100 &&
+              robot.y <= 300
+            );
           },
-          mazeId: 1,
+          maze: "simple",
         },
         {
           id: 4,
-          name: "Challenge 4: Navigate Maze",
-          description: "Navigate through a simple maze",
-          startCode: `from aidriver import AIDriver
-import time
-
-robot = AIDriver()
-
-# Navigate the maze`,
-          successCriteria: function (robot, startPos) {
-            // Robot should reach the goal area
-            return robot.x > 1800 && robot.y > 1800;
+          name: "Challenge 4: Dead End Detection",
+          description:
+            "Combine front sensor with side PID to navigate dead ends",
+          startCode: `from aidriver import AIDriver, hold_state
+import aidriver
+my_robot = AIDriver()
+# Sensor fusion: front + side PID`,
+          successCriteria: function (robot) {
+            return robot.x >= 1600 && robot.y <= 300;
           },
-          mazeId: 2,
+          maze: "dead_end",
         },
         {
           id: 5,
-          name: "Challenge 5: Line Follower",
-          description: "Follow a line pattern",
-          startCode: `from aidriver import AIDriver
-import time
-
-robot = AIDriver()
-
-# Line following logic`,
-          successCriteria: function (robot, startPos) {
-            return robot.x > 1500;
+          name: "Challenge 5: Maze Solver",
+          description: "Navigate the full maze using hand-on-wall algorithm",
+          startCode: `from aidriver import AIDriver, hold_state
+import aidriver
+my_robot = AIDriver()
+# Hand-on-wall maze solver`,
+          successCriteria: function (robot) {
+            return robot.x >= 1700 && robot.y <= 300 && !robot.crashed;
           },
-          mazeId: 3,
-        },
-        {
-          id: 6,
-          name: "Challenge 6: Obstacle Course",
-          description: "Navigate through obstacles",
-          startCode: `from aidriver import AIDriver
-import time
-
-robot = AIDriver()
-
-# Obstacle avoidance`,
-          successCriteria: function (robot, startPos) {
-            return robot.x > 1800 && !robot.crashed;
-          },
-          mazeId: 4,
-        },
-        {
-          id: 7,
-          name: "Challenge 7: Free Drive",
-          description: "Control robot with gamepad (no code needed)",
-          startCode: `# Challenge 7: Gamepad Control
-# Use the virtual gamepad or keyboard (WASD/Arrows) to drive!`,
-          successCriteria: function (robot, startPos) {
-            // Just explore
-            return true;
-          },
-          mazeId: null,
-          isGamepad: true,
+          maze: "zigzag",
         },
       ],
 
@@ -166,34 +106,27 @@ robot = AIDriver()
         return this.list.length;
       },
 
-      getCurrent: function (currentId) {
-        return this.get(currentId);
-      },
-
       getNext: function (currentId) {
-        const next = currentId + 1;
-        return next < this.list.length ? this.get(next) : null;
+        const idx = this.list.findIndex((c) => c.id === currentId);
+        return idx >= 0 && idx < this.list.length - 1
+          ? this.list[idx + 1]
+          : null;
       },
 
       getPrevious: function (currentId) {
-        const prev = currentId - 1;
-        return prev >= 0 ? this.get(prev) : null;
-      },
-
-      isGamepadChallenge: function (id) {
-        const challenge = this.get(id);
-        return challenge ? challenge.isGamepad === true : false;
+        const idx = this.list.findIndex((c) => c.id === currentId);
+        return idx > 0 ? this.list[idx - 1] : null;
       },
     };
   });
 
   describe("Challenge List", () => {
-    test("should have 8 challenges", () => {
-      expect(ChallengesImpl.getCount()).toBe(8);
+    test("should have 5 challenges", () => {
+      expect(ChallengesImpl.getCount()).toBe(5);
     });
 
-    test("challenges should have sequential IDs 0-7", () => {
-      for (let i = 0; i < 8; i++) {
+    test("challenges should have sequential IDs 1-5", () => {
+      for (let i = 1; i <= 5; i++) {
         expect(ChallengesImpl.get(i)).not.toBeNull();
         expect(ChallengesImpl.get(i).id).toBe(i);
       }
@@ -208,13 +141,19 @@ robot = AIDriver()
         expect(typeof challenge.successCriteria).toBe("function");
       });
     });
+
+    test("no challenge 0, 6, or 7 should exist", () => {
+      expect(ChallengesImpl.get(0)).toBeNull();
+      expect(ChallengesImpl.get(6)).toBeNull();
+      expect(ChallengesImpl.get(7)).toBeNull();
+    });
   });
 
   describe("get()", () => {
     test("should return challenge by ID", () => {
-      const challenge = ChallengesImpl.get(0);
+      const challenge = ChallengesImpl.get(1);
       expect(challenge).not.toBeNull();
-      expect(challenge.id).toBe(0);
+      expect(challenge.id).toBe(1);
     });
 
     test("should return null for invalid ID", () => {
@@ -224,19 +163,19 @@ robot = AIDriver()
 
     test("should return correct challenge data", () => {
       const challenge = ChallengesImpl.get(1);
-      expect(challenge.name).toContain("Move Forward");
+      expect(challenge.name).toContain("P Control");
     });
   });
 
   describe("getNext() and getPrevious()", () => {
     test("getNext() should return next challenge", () => {
-      const next = ChallengesImpl.getNext(0);
+      const next = ChallengesImpl.getNext(1);
       expect(next).not.toBeNull();
-      expect(next.id).toBe(1);
+      expect(next.id).toBe(2);
     });
 
     test("getNext() should return null for last challenge", () => {
-      expect(ChallengesImpl.getNext(7)).toBeNull();
+      expect(ChallengesImpl.getNext(5)).toBeNull();
     });
 
     test("getPrevious() should return previous challenge", () => {
@@ -246,67 +185,80 @@ robot = AIDriver()
     });
 
     test("getPrevious() should return null for first challenge", () => {
-      expect(ChallengesImpl.getPrevious(0)).toBeNull();
+      expect(ChallengesImpl.getPrevious(1)).toBeNull();
     });
   });
 
   describe("Success Criteria", () => {
-    test("Challenge 0 should always succeed", () => {
-      const challenge = ChallengesImpl.get(0);
-      const robot = { x: 1000, y: 1000, angle: 0 };
-      expect(challenge.successCriteria(robot, robot)).toBe(true);
-    });
-
-    test("Challenge 1 should check forward movement", () => {
+    test("Challenge 1 should succeed when robot reaches end zone", () => {
       const challenge = ChallengesImpl.get(1);
-      const startPos = { x: 1000, y: 1000 };
-      const robot = { x: 1200, y: 1000 };
-      expect(challenge.successCriteria(robot, startPos)).toBe(true);
+      const robot = { x: 200, y: 150 };
+      expect(challenge.successCriteria(robot)).toBe(true);
     });
 
-    test("Challenge 1 should fail if not moved enough", () => {
+    test("Challenge 1 should fail if robot at start", () => {
       const challenge = ChallengesImpl.get(1);
-      const startPos = { x: 1000, y: 1000 };
-      const robot = { x: 1050, y: 1000 };
-      expect(challenge.successCriteria(robot, startPos)).toBe(false);
+      const robot = { x: 300, y: 1700 };
+      expect(challenge.successCriteria(robot)).toBe(false);
     });
 
-    test("Challenge 2 should check return to start", () => {
-      const challenge = ChallengesImpl.get(2);
-      const startPos = { x: 1000, y: 1000 };
-      const robot = { x: 1050, y: 1050 };
-      expect(challenge.successCriteria(robot, startPos)).toBe(true);
+    test("Challenge 3 should succeed if robot reached L-corner goal", () => {
+      const challenge = ChallengesImpl.get(3);
+      const robot = { x: 150, y: 150 };
+      expect(challenge.successCriteria(robot)).toBe(true);
     });
 
-    test("Challenge 7 should always succeed", () => {
-      const challenge = ChallengesImpl.get(7);
-      const robot = { x: 500, y: 500 };
-      expect(challenge.successCriteria(robot, robot)).toBe(true);
-    });
-  });
-
-  describe("Gamepad Challenge", () => {
-    test("Challenge 7 should be gamepad challenge", () => {
-      expect(ChallengesImpl.isGamepadChallenge(7)).toBe(true);
+    test("Challenge 3 should fail if robot hasn't reached goal", () => {
+      const challenge = ChallengesImpl.get(3);
+      const robot = { x: 300, y: 1700 };
+      expect(challenge.successCriteria(robot)).toBe(false);
     });
 
-    test("Other challenges should not be gamepad challenges", () => {
-      for (let i = 0; i < 7; i++) {
-        expect(ChallengesImpl.isGamepadChallenge(i)).toBe(false);
-      }
+    test("Challenge 4 should succeed at dead end goal area", () => {
+      const challenge = ChallengesImpl.get(4);
+      const robot = { x: 1700, y: 150 };
+      expect(challenge.successCriteria(robot)).toBe(true);
+    });
+
+    test("Challenge 5 should succeed if robot reached maze exit without crash", () => {
+      const challenge = ChallengesImpl.get(5);
+      const robot = { x: 1800, y: 150, crashed: false };
+      expect(challenge.successCriteria(robot)).toBe(true);
+    });
+
+    test("Challenge 5 should fail if robot crashed", () => {
+      const challenge = ChallengesImpl.get(5);
+      const robot = { x: 1800, y: 150, crashed: true };
+      expect(challenge.successCriteria(robot)).toBe(false);
     });
   });
 
   describe("Maze Assignments", () => {
-    test("early challenges should have no maze", () => {
-      expect(ChallengesImpl.get(0).mazeId).toBeNull();
-      expect(ChallengesImpl.get(1).mazeId).toBeNull();
-      expect(ChallengesImpl.get(2).mazeId).toBeNull();
+    test("Challenge 1 should use straight_corridor maze", () => {
+      expect(ChallengesImpl.get(1).maze).toBe("straight_corridor");
     });
 
-    test("maze challenges should have mazeId", () => {
-      expect(ChallengesImpl.get(3).mazeId).not.toBeNull();
-      expect(ChallengesImpl.get(4).mazeId).not.toBeNull();
+    test("Challenge 2 should use straight_corridor maze", () => {
+      expect(ChallengesImpl.get(2).maze).toBe("straight_corridor");
+    });
+
+    test("Challenge 3 should use simple (L-shaped) maze", () => {
+      expect(ChallengesImpl.get(3).maze).toBe("simple");
+    });
+
+    test("Challenge 4 should use dead_end maze", () => {
+      expect(ChallengesImpl.get(4).maze).toBe("dead_end");
+    });
+
+    test("Challenge 5 should use zigzag maze as default", () => {
+      expect(ChallengesImpl.get(5).maze).toBe("zigzag");
+    });
+
+    test("all challenges should have a maze", () => {
+      ChallengesImpl.getAll().forEach((challenge) => {
+        expect(challenge.maze).toBeDefined();
+        expect(challenge.maze).not.toBeNull();
+      });
     });
   });
 
@@ -318,15 +270,35 @@ robot = AIDriver()
     });
 
     test("start code should include AIDriver import", () => {
-      for (let i = 0; i < 7; i++) {
-        const challenge = ChallengesImpl.get(i);
+      ChallengesImpl.getAll().forEach((challenge) => {
         expect(challenge.startCode).toContain("aidriver");
-      }
+      });
     });
 
-    test("Challenge 7 should have gamepad instructions", () => {
-      const challenge = ChallengesImpl.get(7);
-      expect(challenge.startCode).toContain("Gamepad");
+    test("no challenge should reference gamepad", () => {
+      ChallengesImpl.getAll().forEach((challenge) => {
+        expect(challenge.startCode.toLowerCase()).not.toContain("gamepad");
+      });
+    });
+  });
+
+  describe("PID Progression", () => {
+    test("challenges should progress from P to PD to PID", () => {
+      const c1 = ChallengesImpl.get(1);
+      const c2 = ChallengesImpl.get(2);
+      const c3 = ChallengesImpl.get(3);
+
+      expect(c1.name).toContain("P Control");
+      expect(c2.name).toContain("PD Control");
+      expect(c3.name).toContain("Full PID");
+    });
+
+    test("challenges 4-5 should be sensor fusion and maze solving", () => {
+      const c4 = ChallengesImpl.get(4);
+      const c5 = ChallengesImpl.get(5);
+
+      expect(c4.name).toContain("Dead End");
+      expect(c5.name).toContain("Maze Solver");
     });
   });
 });

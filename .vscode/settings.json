@@ -27,7 +27,7 @@
     "/root/.vscode-remote/extensions/benpaddlejones.pico-bridge-2.0.2/emulator/mock/micropython"
   ],
   "micropico.syncFolder": "project",
-  "workbench.colorTheme": "Default Dark+",
+  "workbench.colorTheme": "Visual Studio Dark",
   "workbench.iconTheme": "icons",
   "github.copilot.enable": {
     "python": false,

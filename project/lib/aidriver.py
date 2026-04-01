@@ -483,7 +483,7 @@ class L298N:
 
 class AIDriver:
     """
-    Unified robot driver class with L298NH motor control and SR-HC04 ultrasonic sensor
+    Unified robot driver class with L298NH motor control and SR-HC04 ultrasonic sensors
     The L298NH requires L298N channels to be called simultaneously.
     """
 
@@ -495,8 +495,10 @@ class AIDriver:
         right_brake_pin=9,  # GP9
         left_dir_pin=13,  # GP13
         left_brake_pin=8,  # GP8
-        trig_pin=6,  # GP6
-        echo_pin=7,  # GP7
+        trig_pin=6,  # GP6 (front sensor)
+        echo_pin=7,  # GP7 (front sensor)
+        trig_pin_2=4,  # GP4 (second sensor)
+        echo_pin_2=5,  # GP5 (second sensor)
     ):
         """Initialize RP2040 based AIDriver differential drive robot.
 
@@ -507,8 +509,10 @@ class AIDriver:
             right_brake_pin: Digital pin for right motor brake (default GP9)
             left_dir_pin: Digital pin for left motor direction (default GP13)
             left_brake_pin: Digital pin for left motor brake (default GP8)
-            trig_pin: Ultrasonic sensor trigger pin (default GP6)
-            echo_pin: Ultrasonic sensor echo pin (default GP7)
+            trig_pin: Ultrasonic sensor 1 trigger pin (default GP6)
+            echo_pin: Ultrasonic sensor 1 echo pin (default GP7)
+            trig_pin_2: Ultrasonic sensor 2 trigger pin (default GP4)
+            echo_pin_2: Ultrasonic sensor 2 echo pin (default GP5)
         """
 
         # Library-side preflight: log pin config and attempt a quick sensor ping
@@ -530,28 +534,48 @@ class AIDriver:
             trig_pin,
             "ECHO=",
             echo_pin,
+            "TRIG_2=",
+            trig_pin_2,
+            "ECHO_2=",
+            echo_pin_2,
         )
 
         # Initialize motor controllers
         self.motor_right = L298N(right_speed_pin, right_dir_pin, right_brake_pin)
         self.motor_left = L298N(left_speed_pin, left_dir_pin, left_brake_pin)
 
-        # Initialize ultrasonic sensor
-        self.ultrasonic = UltrasonicSensor(trig_pin, echo_pin)
+        # Initialize ultrasonic sensors
+        self.ultrasonic_1 = UltrasonicSensor(trig_pin, echo_pin)
+        self.ultrasonic_2 = UltrasonicSensor(trig_pin_2, echo_pin_2)
 
-        # Silent hardware sanity ping (only visible if DEBUG_AIDRIVER is True)
+        # Silent hardware sanity ping for sensor 1 (only visible if DEBUG_AIDRIVER is True)
         try:
-            d = self.ultrasonic.read_distance_mm()
+            d = self.ultrasonic_1.read_distance_mm()
             if d == -1:
                 _d(
-                    "Ultrasonic preflight: reading -1. Check wiring, aim at object 2–200cm.",
+                    "Ultrasonic 1 preflight: reading -1. Check wiring, aim at object 2–200cm.",
                 )
         except Exception as exc:
             _d(
-                "Ultrasonic preflight error:",
+                "Ultrasonic 1 preflight error:",
                 type(exc).__name__,
                 str(exc),
                 "– check TRIG/ECHO pins and sensor power.",
+            )
+
+        # Silent hardware sanity ping for sensor 2
+        try:
+            d = self.ultrasonic_2.read_distance_mm()
+            if d == -1:
+                _d(
+                    "Ultrasonic 2 preflight: reading -1. Check wiring, aim at object 2–200cm.",
+                )
+        except Exception as exc:
+            _d(
+                "Ultrasonic 2 preflight error:",
+                type(exc).__name__,
+                str(exc),
+                "– check TRIG_2/ECHO_2 pins and sensor power.",
             )
 
         _d("AIDriver initialized - debug logging active")
@@ -562,16 +586,30 @@ class AIDriver:
 
     def read_distance(self):
         """
-        Read distance from ultrasonic sensor.
+        Read distance from ultrasonic sensor 1 (front sensor).
 
         Returns:
             Distance in millimeters, or -1 if invalid reading.
         """
-        distance_mm = self.ultrasonic.read_distance_mm()
+        distance_mm = self.ultrasonic_1.read_distance_mm()
         if distance_mm == -1:
             # Don't print debug here - inline warning handles user feedback
             return -1
         _d("read_distance:", distance_mm, "mm")
+        return int(distance_mm)
+
+    def read_distance_2(self):
+        """
+        Read distance from ultrasonic sensor 2 (second sensor on GP4/GP5).
+
+        Returns:
+            Distance in millimeters, or -1 if invalid reading.
+        """
+        distance_mm = self.ultrasonic_2.read_distance_mm()
+        if distance_mm == -1:
+            # Don't print debug here - inline warning handles user feedback
+            return -1
+        _d("read_distance_2:", distance_mm, "mm")
         return int(distance_mm)
 
     def brake(self):
@@ -703,6 +741,88 @@ class AIDriver:
         except Exception as exc:
             _explain_error(exc)
             raise
+
+    # Minimum reliable motor speed - motors stutter below this due to undervoltage
+    MIN_MOTOR_SPEED = 120
+
+    def drive(self, right_speed, left_speed):
+        """
+        Drive robot with signed speeds for PID control.
+
+        This is a convenience method for control loops where positive speeds
+        mean forward and negative speeds mean backward. It handles the
+        direction logic and motor dead zone internally.
+
+        Dead Zone Handling:
+            Motors don't work reliably below speed 120. This method applies:
+            - If |speed| < MIN_MOTOR_SPEED: that wheel stops (speed too low)
+            - If |speed| >= MIN_MOTOR_SPEED: wheel drives at requested speed
+
+        Args:
+            right_speed: Speed for right wheel (-255 to 255)
+                         Positive = forward, Negative = backward
+            left_speed: Speed for left wheel (-255 to 255)
+                        Positive = forward, Negative = backward
+
+        Example for PID control::
+
+            # Simple - just call drive with signed speeds
+            my_robot.drive(speed, speed)
+
+            # For wall following with differential steering:
+            my_robot.drive(BASE_SPEED + correction, BASE_SPEED - correction)
+        """
+        # Clamp speeds to valid range
+        right_speed = max(-255, min(255, int(right_speed)))
+        left_speed = max(-255, min(255, int(left_speed)))
+
+        # Apply dead zone: speeds below MIN_MOTOR_SPEED don't work reliably
+        if abs(right_speed) < self.MIN_MOTOR_SPEED:
+            right_speed = 0
+        if abs(left_speed) < self.MIN_MOTOR_SPEED:
+            left_speed = 0
+
+        _d("AIDriver.drive: R=", right_speed, "L=", left_speed)
+
+        # If both speeds are zero, brake
+        if right_speed == 0 and left_speed == 0:
+            self.brake()
+            return
+
+        # Handle right motor
+        if right_speed > 0:
+            self.motor_right.set_speed(right_speed)
+            self.motor_right.backward()  # backward() = forward motion for right wheel
+        elif right_speed < 0:
+            self.motor_right.set_speed(abs(right_speed))
+            self.motor_right.forward()   # forward() = backward motion for right wheel
+        else:
+            self.motor_right.stop()
+
+        # Handle left motor
+        if left_speed > 0:
+            self.motor_left.set_speed(left_speed)
+            self.motor_left.forward()    # forward() = forward motion for left wheel
+        elif left_speed < 0:
+            self.motor_left.set_speed(abs(left_speed))
+            self.motor_left.backward()   # backward() = backward motion for left wheel
+        else:
+            self.motor_left.stop()
+
+        # Log the movement
+        if eventlog is not None:
+            try:
+                if right_speed >= 0 and left_speed >= 0:
+                    direction = "forward"
+                elif right_speed <= 0 and left_speed <= 0:
+                    direction = "backward"
+                else:
+                    direction = "mixed"
+                eventlog.log_event(
+                    "drive {} R={}, L={}".format(direction, right_speed, left_speed)
+                )
+            except Exception:
+                pass
 
     def set_motor_speeds(self, right_speed, left_speed):
         """

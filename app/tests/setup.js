@@ -51,7 +51,7 @@ const shouldSuppressConsole = (args) =>
       return fieldsToCheck.some(
         (field) =>
           typeof field === "string" &&
-          suppressedConsolePatterns.some((pattern) => pattern.test(field))
+          suppressedConsolePatterns.some((pattern) => pattern.test(field)),
       );
     }
 
@@ -275,59 +275,46 @@ global.PythonRunner = {
   isRunning: jest.fn().mockReturnValue(false),
 };
 
-// Mock Challenges globally
+// Mock Challenges globally (PID progression: challenges 1-5)
 global.Challenges = {
   list: [
     {
-      id: 0,
-      name: "Challenge 0",
-      description: "Test",
-      successCriteria: () => true,
-    },
-    {
       id: 1,
-      name: "Challenge 1",
+      name: "Challenge 1: Wall Follow — P Control",
       description: "Test",
+      maze: "straight_corridor",
       successCriteria: () => true,
     },
     {
       id: 2,
-      name: "Challenge 2",
+      name: "Challenge 2: Wall Follow — PD Control",
       description: "Test",
+      maze: "straight_corridor",
       successCriteria: () => true,
     },
     {
       id: 3,
-      name: "Challenge 3",
+      name: "Challenge 3: Wall Follow — Full PID",
       description: "Test",
+      maze: "simple",
       successCriteria: () => true,
     },
     {
       id: 4,
-      name: "Challenge 4",
+      name: "Challenge 4: Dead End Detection",
       description: "Test",
+      maze: "dead_end",
       successCriteria: () => true,
     },
     {
       id: 5,
-      name: "Challenge 5",
+      name: "Challenge 5: Maze Solver",
       description: "Test",
-      successCriteria: () => true,
-    },
-    {
-      id: 6,
-      name: "Challenge 6",
-      description: "Test",
-      successCriteria: () => true,
-    },
-    {
-      id: 7,
-      name: "Challenge 7",
-      description: "Test (Gamepad)",
+      maze: "zigzag",
       successCriteria: () => true,
     },
   ],
-  get: jest.fn((id) => global.Challenges.list[id]),
+  get: jest.fn((id) => global.Challenges.list.find((c) => c.id === id) || null),
   getCurrent: jest.fn(() => global.Challenges.list[0]),
 };
 
@@ -350,7 +337,7 @@ global.Gamepad = {
 // Mock App globally
 global.App = {
   init: jest.fn(),
-  currentChallenge: 0,
+  currentChallenge: 1,
   robot: {
     x: 1000,
     y: 1000,

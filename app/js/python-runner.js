@@ -255,7 +255,7 @@ class AIDriver:
             print("[AIDriver] brake")
     
     def read_distance(self):
-        """Read ultrasonic sensor distance in mm"""
+        """Read front ultrasonic sensor distance in mm"""
         global DEBUG_AIDRIVER
         # This will be overridden by JavaScript
         _queue_command("read_distance")
@@ -264,6 +264,49 @@ class AIDriver:
             print("[AIDriver] read_distance:", distance_mm, "mm")
         return distance_mm
     
+    def read_distance_2(self):
+        """Read side ultrasonic sensor distance in mm"""
+        global DEBUG_AIDRIVER
+        # This will be overridden by JavaScript
+        _queue_command("read_distance_2")
+        distance_mm = 1000  # Placeholder, JS overrides actual value
+        if DEBUG_AIDRIVER:
+            print("[AIDriver] read_distance_2:", distance_mm, "mm")
+        return distance_mm
+    
+    # Minimum reliable motor speed - motors stutter below this due to undervoltage
+    MIN_MOTOR_SPEED = 120
+
+    def drive(self, right_speed, left_speed):
+        """Drive robot with signed speeds for PID control.
+
+        Positive = forward, negative = backward.
+        Speeds with magnitude below MIN_MOTOR_SPEED are treated as zero.
+
+        Args:
+            right_speed: -255 to 255
+            left_speed:  -255 to 255
+        """
+        global DEBUG_AIDRIVER
+        right_speed = max(-255, min(255, int(right_speed)))
+        left_speed  = max(-255, min(255, int(left_speed)))
+        if abs(right_speed) < self.MIN_MOTOR_SPEED:
+            right_speed = 0
+        if abs(left_speed) < self.MIN_MOTOR_SPEED:
+            left_speed = 0
+        if right_speed == 0 and left_speed == 0:
+            self.brake()
+            return
+        self._right_speed = right_speed
+        self._left_speed = left_speed
+        self._is_moving = True
+        _queue_command("drive", {
+            "rightSpeed": right_speed,
+            "leftSpeed": left_speed
+        })
+        if DEBUG_AIDRIVER:
+            print("[AIDriver] drive:", right_speed, left_speed)
+
     def service(self):
         """Run background housekeeping tasks (no-op in simulator)"""
         # In real robot this handles LED heartbeat
@@ -1173,6 +1216,18 @@ def ticks_diff(t1, t2):
         // Hold current state - physics handled by startAnimationLoop()
         break;
 
+      case "drive":
+        // Signed-speed PID method: positive = forward, negative = backward
+        App.robot.leftSpeed = cmd.params.leftSpeed;
+        App.robot.rightSpeed = cmd.params.rightSpeed;
+        App.robot.isMoving = true;
+        break;
+
+      case "read_distance":
+      case "read_distance_2":
+        // Sensor reads are handled inline by the stub; no state change needed
+        break;
+
       default:
         console.log("[PythonRunner] Unknown command type:", cmd.type);
     }
@@ -1246,7 +1301,37 @@ def ticks_diff(t1, t2):
     // Try to get commands from Python's aidriver module
     let commands = [];
 
-    // Read commands from AIDriverStub queue (populated by the JS builtin module)
+    try {
+      // Access the aidriver module if it's been imported
+      if (Sk.sysmodules && Sk.sysmodules.mp$subscript) {
+        const aidriverMod = Sk.sysmodules.mp$subscript(
+          new Sk.builtin.str("aidriver"),
+        );
+        if (aidriverMod) {
+          // Call _get_commands() to retrieve and clear the queue
+          const getCommandsFunc = aidriverMod.tp$getattr(
+            new Sk.builtin.str("_get_commands"),
+          );
+          if (getCommandsFunc) {
+            const result = Sk.misceval.callsimOrSuspend(getCommandsFunc);
+            if (result && result.v) {
+              // Convert Python list to JavaScript array
+              commands = Sk.ffi.remapToJs(result);
+              console.log(
+                "[PythonRunner] Got commands from Python:",
+                commands.length,
+                commands.map((c) => c.type),
+              );
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Module not loaded yet or error - ignore
+      console.log("[PythonRunner] Could not get commands from Python:", e);
+    }
+
+    // Also check AIDriverStub for backwards compatibility
     while (AIDriverStub.hasCommands()) {
       commands.push(AIDriverStub.getNextCommand());
     }
@@ -1318,7 +1403,14 @@ def ticks_diff(t1, t2):
             // Hold state is handled by Python's time.sleep
             break;
 
+          case "drive":
+            App.robot.leftSpeed = cmd.params.leftSpeed;
+            App.robot.rightSpeed = cmd.params.rightSpeed;
+            App.robot.isMoving = true;
+            break;
+
           case "read_distance":
+          case "read_distance_2":
             // Just logging, no action needed
             break;
 

@@ -32,7 +32,7 @@ const AIDriverStub = {
     if (this.DEBUG_AIDRIVER) {
       DebugPanel.log(
         `[AIDriver] ${cmd.type}: ${JSON.stringify(cmd.params)}`,
-        "info"
+        "info",
       );
     }
   },
@@ -104,7 +104,7 @@ const AIDriverStub = {
           $loc.drive_forward = new Sk.builtin.func(function (
             self,
             rightSpeed,
-            leftSpeed
+            leftSpeed,
           ) {
             const rs = Sk.ffi.remapToJs(rightSpeed);
             const ls = Sk.ffi.remapToJs(leftSpeed);
@@ -130,7 +130,7 @@ const AIDriverStub = {
           $loc.drive_backward = new Sk.builtin.func(function (
             self,
             rightSpeed,
-            leftSpeed
+            leftSpeed,
           ) {
             const rs = Sk.ffi.remapToJs(rightSpeed);
             const ls = Sk.ffi.remapToJs(leftSpeed);
@@ -205,6 +205,54 @@ const AIDriverStub = {
           });
 
           /**
+           * Minimum reliable motor speed constant matching the hardware library.
+           */
+          $loc.MIN_MOTOR_SPEED = new Sk.builtin.int_(120);
+
+          /**
+           * Drive with signed speeds for PID control.
+           * Positive = forward, negative = backward.
+           * Speeds below MIN_MOTOR_SPEED magnitude are treated as zero.
+           * @param {Sk.builtin.int_} rightSpeed -255 to 255.
+           * @param {Sk.builtin.int_} leftSpeed -255 to 255.
+           * @returns {null}
+           */
+          $loc.drive = new Sk.builtin.func(function (
+            self,
+            rightSpeed,
+            leftSpeed,
+          ) {
+            const MIN_MOTOR_SPEED = 120;
+            let rs = Math.max(
+              -255,
+              Math.min(255, Sk.ffi.remapToJs(rightSpeed)),
+            );
+            let ls = Math.max(-255, Math.min(255, Sk.ffi.remapToJs(leftSpeed)));
+
+            if (Math.abs(rs) < MIN_MOTOR_SPEED) rs = 0;
+            if (Math.abs(ls) < MIN_MOTOR_SPEED) ls = 0;
+
+            if (rs === 0 && ls === 0) {
+              self.rightSpeed = 0;
+              self.leftSpeed = 0;
+              self.isMoving = false;
+              AIDriverStub.queueCommand({ type: "brake", params: {} });
+              return Sk.builtin.none.none$;
+            }
+
+            self.rightSpeed = rs;
+            self.leftSpeed = ls;
+            self.isMoving = true;
+
+            AIDriverStub.queueCommand({
+              type: "drive",
+              params: { rightSpeed: rs, leftSpeed: ls },
+            });
+
+            return Sk.builtin.none.none$;
+          });
+
+          /**
            * Measure distance using the simulator abstraction.
            * @returns {Sk.builtin.int_} Integer distance in simulated centimeters.
            */
@@ -221,6 +269,28 @@ const AIDriverStub = {
 
             AIDriverStub.queueCommand({
               type: "read_distance",
+              params: { result: distance },
+            });
+
+            return new Sk.builtin.int_(distance);
+          });
+
+          /**
+           * Measure distance using the side-facing ultrasonic sensor.
+           * @returns {Sk.builtin.int_} Integer distance in mm from the side sensor.
+           */
+          $loc.read_distance_2 = new Sk.builtin.func(function (self) {
+            let distance = 1000;
+            if (
+              typeof Simulator !== "undefined" &&
+              typeof App !== "undefined" &&
+              App.robot
+            ) {
+              distance = Simulator.simulateUltrasonicSide(App.robot);
+            }
+
+            AIDriverStub.queueCommand({
+              type: "read_distance_2",
               params: { result: distance },
             });
 
@@ -255,7 +325,7 @@ const AIDriverStub = {
           $loc.set_motor_speeds = new Sk.builtin.func(function (
             self,
             rightSpeed,
-            leftSpeed
+            leftSpeed,
           ) {
             const rs = Sk.ffi.remapToJs(rightSpeed);
             const ls = Sk.ffi.remapToJs(leftSpeed);
@@ -272,7 +342,7 @@ const AIDriverStub = {
           });
         },
         "AIDriver",
-        []
+        [],
       );
 
       /**
@@ -298,7 +368,7 @@ const AIDriverStub = {
         const scaledMs = (secs * 1000) / (App.speedMultiplier || 1);
         console.log(
           "[AIDriverStub] Creating promiseToSuspension with scaledMs:",
-          scaledMs
+          scaledMs,
         );
 
         return new Sk.misceval.promiseToSuspension(
@@ -306,13 +376,13 @@ const AIDriverStub = {
             console.log(
               "[AIDriverStub] Promise created, setting setTimeout for",
               scaledMs,
-              "ms"
+              "ms",
             );
             setTimeout(() => {
               console.log("[AIDriverStub] setTimeout fired, resolving promise");
               resolve(Sk.builtin.none.none$);
             }, scaledMs);
-          })
+          }),
         );
       });
 

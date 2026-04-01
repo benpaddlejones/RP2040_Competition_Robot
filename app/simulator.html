@@ -486,7 +486,22 @@
                 <div class="d-flex align-items-center">
                   <i class="bi bi-broadcast text-info me-2"></i>
                   <span class="badge bg-info" id="ultrasonicDisplay"
-                    >Distance: --- mm</span
+                    >Front: --- mm</span
+                  >
+                </div>
+                <!-- Side Sensor Display and Toggle -->
+                <div class="d-flex align-items-center ms-2">
+                  <button
+                    class="btn btn-sm btn-outline-light me-1"
+                    id="btnToggleSideSensor"
+                    data-bs-toggle="tooltip"
+                    title="Toggle side sensor between left and right"
+                  >
+                    <i class="bi bi-arrow-left-right"></i>
+                    <span id="sideSensorLabel" class="ms-1">Left</span>
+                  </button>
+                  <span class="badge bg-secondary" id="sideSensorDisplay"
+                    >Side: --- mm</span
                   >
                 </div>
               </div>
